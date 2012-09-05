@@ -14,24 +14,20 @@ var brainfuck = function(s) {
                 var done = new Date().getTime();
                 var secs = (done - ts) / 1000;
 
-                console.log('Completed '.concat(
+                console.log(this.name + ': Completed '.concat(
                             ops,
                             ' operations in ',
                             secs,
                             ' seconds (',
-                            ops/secs,
-                            ' ops/s)'));
+                            (ops / 1000) / secs,
+                            ' kops/s)'));
               },
     success:  function() {
-                console.log('Execution Successful');
+                console.log(this.name + ': Execution Successful');
               },
     error:    function(stack) {
-                console.error('Execution Failed');
-                if (stack.map && stack.join) {
-                  console.error(stack
-                                  .map(function(i) { return '  ' + i; } )
-                                  .join('\n'));
-                };
+                // Stack is array of {status (String), fatal (Boolean)}
+                console.log(this.name + ': Execution Failed');
               },
   };
 
@@ -39,26 +35,51 @@ var brainfuck = function(s) {
     for (i in s) {
       this.vm[i] = s[i];
     }
+
+    if (!this.vm.name) {
+      var crypto = require('crypto');
+  
+      if (this.vm.src) {
+        var id = this.vm.src;
+      } else {
+        var id = new Date().getTime().toString();
+      }
+      
+      this.vm.name = crypto.createHash('sha256').update(id).digest('hex').slice(0, 10);
+    }
   }
 
   // Interpreter
   this.exec = function(limit) {
     // Initialise
-    var d  = [0];                                // Data (expands rightwards)
-    var dp = 0;                                  // Data pointer
+    var d  = [0];                       // Data (expands rightwards)
+    var dp = 0;                         // Data pointer
 
-    var xp = 0;                                  // Execution pointer
-    var xStack = new Array();                    // Execution stack
-    var xi = 0;                                  // Operation count
-    var xStart = new Date().getTime();           // Execution start time;
+    var xp = 0;                         // Execution pointer
+    var xStack = new Array();           // Execution stack
+    var xi = 0;                         // Operation count
+    var xStart = new Date().getTime();  // Execution start time;
 
-    var inStack = me.vm.in                       // String input is converted into a numeric stack:
-                    .split('')                   // e.g., 'foo' > [111, 111, 102]
+    var inStack = me.vm.in              // String input is converted into a numeric stack:
+                    .split('')          // e.g., 'foo' > [111, 111, 102]
                     .reverse()
                     .map(function(i) { return i.charCodeAt(0); });
 
     var outStack = new Array();
-    var errorStack = new Array();
+    var errorStack = {
+      errors: new Array(),
+      push:   function(text, fatal) {
+                var status = me.vm.name + ': ' + (fatal?'ERROR ':'WARNING ') + text;
+                this.errors.push({status: text, fatal: fatal});
+
+                if (fatal) {
+                  console.error(status);
+                  me.vm.error(this.errors);
+                } else {
+                  console.warn(status);
+                }
+              }
+    };
  
     // Execute
     while (xp < me.vm.src.length && (limit?xi < limit:true)) {
@@ -84,9 +105,8 @@ var brainfuck = function(s) {
         case '<':
           ++xi;
           if (--dp < 0) {
-            errorStack.push('Error: Beginning of file at ' + xp);
+            errorStack.push('Beginning of file at ' + xp, true);
             me.vm.complete(xi, xStart);
-            me.vm.error(errorStack);
             return false;
           }
           ++xp;
@@ -104,7 +124,7 @@ var brainfuck = function(s) {
             d[dp] = get;
           } else {
             d[dp] = 0;
-            console.warn('  Warning: No input');
+            errorStack.push('Input exhausted at ' + xp, false);
           }
           ++xp;
           break;
@@ -123,9 +143,8 @@ var brainfuck = function(s) {
             if (jump = xStack.slice(-1)[0]) {
               xp = jump;
             } else {
-              errorStack.push('Error: No return point from ' + xp);
+              errorStack.push('No return point from ' + xp, true);
               me.vm.complete(xi, xStart);
-              me.vm.error(errorStack);
               return false;
             }
           }
@@ -136,21 +155,38 @@ var brainfuck = function(s) {
       }
     }
 
+    if (limit && xi >= limit) errorStack.push('Execution limit reached', false);
+
     // Finish up
-    me.vm.complete(xi, xStart);
     me.vm.success();
-    return outStack.map(function(i) { return String.fromCharCode(i); }).join('');
+    me.vm.complete(xi, xStart);
+    return outStack
+             .map(function(i) { return String.fromCharCode(i); })  // Returns '?' when out of Unicode bounds
+             .join('');
   };
 };
 
 var helloWorld = new brainfuck({
-  src: '++++++++++ This should be ignored [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.'
-});
-
-var outputter = new brainfuck({
-  src: '++++++++++++[>,.<-]',
-  in:  'Hello world!'
+  src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
+  name: 'hello.bf'
 });
 
 console.log(helloWorld.exec());
-console.log(outputter.exec(100));
+
+function bfPrint(text) {
+  var noop = function() {};
+  var outputter = new brainfuck({
+    src: text.replace(/./g, '+') + '[>,.<-]',
+    in:  text,
+
+    complete: noop,
+    error:    noop,
+    success:  noop
+  });
+
+  if(x = outputter.exec()) {
+    console.log(x); 
+  };
+}
+
+bfPrint('Lorem ipsum dolor sit amet...');
