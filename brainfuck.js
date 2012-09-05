@@ -2,7 +2,7 @@
 // Christopher Harrison, 2012
 // MIT License
 
-var brainfuck = function(s) {
+exports.brainfuck = function(s) {
   var me = this;
 
   // Settings for VM
@@ -165,28 +165,3 @@ var brainfuck = function(s) {
              .join('');
   };
 };
-
-var helloWorld = new brainfuck({
-  src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
-  name: 'hello.bf'
-});
-
-console.log(helloWorld.exec());
-
-function bfPrint(text) {
-  var noop = function() {};
-  var outputter = new brainfuck({
-    src: text.replace(/./g, '+') + '[>,.<-]',
-    in:  text,
-
-    complete: noop,
-    error:    noop,
-    success:  noop
-  });
-
-  if(x = outputter.exec()) {
-    console.log(x); 
-  };
-}
-
-bfPrint('Lorem ipsum dolor sit amet...');
