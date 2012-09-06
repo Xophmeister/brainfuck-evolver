@@ -6,10 +6,10 @@ var helloWorld = new brainfuck({
   src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.'
 });
 
-assert.equal(helloWorld.exec(), 'Hello World!\n');
+assert(helloWorld.exec(1000) === 'Hello World!\n');
 
 var test = new brainfuck({
-  src: '+++++[.-]+]'
+  src: '+++++[-]+]'
 });
 
-assert.equal(test.exec(1000), false);
+assert(test.exec(1000) === false);
