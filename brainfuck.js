@@ -10,7 +10,7 @@ var brainfuck = module.exports = function(s) {
     name:     'Anonymous',
 
     src:      '',
-    in:       '',
+    input:    '',
 
     complete: function(ops, ts, cells) {
                 var done = new Date().getTime(),
@@ -32,7 +32,7 @@ var brainfuck = module.exports = function(s) {
     error:    function(stack) {
                 // Stack is array of {status (String), fatal (Boolean)}
                 console.log(vm.name + ': Execution Failed');
-              },
+              }
   };
 
   // Override VM defaults, if set
@@ -45,7 +45,7 @@ var brainfuck = module.exports = function(s) {
   // Set up event listeners
   var events = ['complete', 'success', 'error'];
   for (i in events) {
-    if (typeof(vm[events[i]]) == 'function') this.on(events[i], vm[events[i]]);
+    if (typeof(vm[events[i]]) === 'function') this.on(events[i], vm[events[i]]);
   }
 
   // Interpreter
@@ -59,7 +59,7 @@ var brainfuck = module.exports = function(s) {
         xi = 0,                         // Operation count
         xStart = new Date().getTime();  // Execution start time;
 
-    var inStack = vm.in                 // String input is converted into a numeric stack:
+    var inStack = vm.input              // String input is converted into a numeric stack:
                     .split('')          // e.g., 'foo' > [111, 111, 102]
                     .reverse()
                     .map(function(i) { return i.charCodeAt(0); });
