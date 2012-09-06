@@ -2,79 +2,79 @@
 // Christopher Harrison, 2012
 // MIT License
 
-exports.brainfuck = function(s) {
+var brainfuck = module.exports = function(s) {
   var me = this;
 
   // Settings for VM
-  this.vm = {
+  var vm = {
+    name:     'Anonymous',
+
     src:      '',
     in:       '',
 
-    complete: function(ops, ts) {
-                var done = new Date().getTime();
-                var secs = (done - ts) / 1000;
+    complete: function(ops, ts, cells) {
+                var done = new Date().getTime(),
+                    secs = (done - ts) / 1000;
 
-                console.log(this.name + ': Completed '.concat(
+                console.log(vm.name + ': Completed '.concat(
                             ops,
                             ' operations in ',
                             secs,
                             ' seconds (',
                             (ops / 1000) / secs,
-                            ' kops/s)'));
+                            ' kops/s) using ',
+                            cells,
+                            ' memory cells'));
               },
     success:  function() {
-                console.log(this.name + ': Execution Successful');
+                console.log(vm.name + ': Execution Successful');
               },
     error:    function(stack) {
                 // Stack is array of {status (String), fatal (Boolean)}
-                console.log(this.name + ': Execution Failed');
+                console.log(vm.name + ': Execution Failed');
               },
   };
 
+  // Override VM defaults, if set
   if (s) {
     for (i in s) {
-      this.vm[i] = s[i];
+      vm[i] = s[i];
     }
+  }
 
-    if (!this.vm.name) {
-      var crypto = require('crypto');
-  
-      if (this.vm.src) {
-        var id = this.vm.src;
-      } else {
-        var id = new Date().getTime().toString();
-      }
-      
-      this.vm.name = crypto.createHash('sha256').update(id).digest('hex').slice(0, 10);
-    }
+  // Set up event listeners
+  var events = ['complete', 'success', 'error'];
+  for (i in events) {
+    if (typeof(vm[events[i]]) == 'function') this.on(events[i], vm[events[i]]);
   }
 
   // Interpreter
   this.exec = function(limit) {
     // Initialise
-    var d  = [0];                       // Data (expands rightwards)
-    var dp = 0;                         // Data pointer
+    var d  = [0],                       // Data (expands rightwards)
+        dp = 0;                         // Data pointer
 
-    var xp = 0;                         // Execution pointer
-    var xStack = new Array();           // Execution stack
-    var xi = 0;                         // Operation count
-    var xStart = new Date().getTime();  // Execution start time;
+    var xp = 0,                         // Execution pointer
+        xStack = new Array(),           // Execution stack
+        xi = 0,                         // Operation count
+        xStart = new Date().getTime();  // Execution start time;
 
-    var inStack = me.vm.in              // String input is converted into a numeric stack:
+    var inStack = vm.in                 // String input is converted into a numeric stack:
                     .split('')          // e.g., 'foo' > [111, 111, 102]
                     .reverse()
                     .map(function(i) { return i.charCodeAt(0); });
 
     var outStack = new Array();
+
     var errorStack = {
       errors: new Array(),
       push:   function(text, fatal) {
-                var status = me.vm.name + ': ' + (fatal?'ERROR ':'WARNING ') + text;
                 this.errors.push({status: text, fatal: fatal});
+                var status = vm.name + ': \u001b' + (fatal?'[31mERROR ':'[34mWARNING ') + '\u001b[0m' + text;
 
                 if (fatal) {
                   console.error(status);
-                  me.vm.error(this.errors);
+                  me.emit('error', this.errors);
                 } else {
                   console.warn(status);
                 }
@@ -82,8 +82,8 @@ exports.brainfuck = function(s) {
     };
  
     // Execute
-    while (xp < me.vm.src.length && (limit?xi < limit:true)) {
-      switch (me.vm.src[xp]) {
+    while (xp < vm.src.length && (limit?xi < limit:true)) {
+      switch (vm.src[xp]) {
         case '+':
           ++xi;
           ++d[dp];
@@ -106,7 +106,7 @@ exports.brainfuck = function(s) {
           ++xi;
           if (--dp < 0) {
             errorStack.push('Beginning of file at ' + xp, true);
-            me.vm.complete(xi, xStart);
+            me.emit('complete', xi, xStart, d.length);
             return false;
           }
           ++xp;
@@ -144,7 +144,7 @@ exports.brainfuck = function(s) {
               xp = jump;
             } else {
               errorStack.push('No return point from ' + xp, true);
-              me.vm.complete(xi, xStart);
+              me.emit('complete', xi, xStart, d.length);
               return false;
             }
           }
@@ -158,10 +158,13 @@ exports.brainfuck = function(s) {
     if (limit && xi >= limit) errorStack.push('Execution limit reached', false);
 
     // Finish up
-    me.vm.success();
-    me.vm.complete(xi, xStart);
+    me.emit('success');
+    me.emit('complete', xi, xStart, d.length);
     return outStack
              .map(function(i) { return String.fromCharCode(i); })  // Returns '?' when out of Unicode bounds
              .join('');
   };
 };
+
+var EventEmitter = require('events').EventEmitter;
+brainfuck.prototype = Object.create(EventEmitter.prototype);

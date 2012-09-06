@@ -1,26 +1,15 @@
-var bf = require('./brainfuck.js');
+var brainfuck = require('./brainfuck.js'),
+    assert    = require('assert');
 
-var helloWorld = new bf.brainfuck({
-  src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
-  name: 'hello.bf'
+var helloWorld = new brainfuck({
+  name: 'hello.bf',
+  src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.'
 });
 
-console.log(helloWorld.exec());
+assert.equal(helloWorld.exec(), 'Hello World!\n');
 
-function bfPrint(text) {
-  var noop = function() {};
-  var outputter = new bf.brainfuck({
-    src: text.replace(/./g, '+') + '[>,.<-]',
-    in:  text,
+var test = new brainfuck({
+  src: '+++++[.-]+]'
+});
 
-    complete: noop,
-    error:    noop,
-    success:  noop
-  });
-
-  if(x = outputter.exec()) {
-    console.log(x); 
-  };
-}
-
-bfPrint('Lorem ipsum dolor sit amet...');
+assert.equal(test.exec(1000), false);
