@@ -38,14 +38,14 @@ var brainfuck = module.exports = function(s) {
   // Override VM defaults, if set
   if (s) {
     for (i in s) {
-      vm[i] = s[i];
+      if (s.hasOwnProperty(i)) vm[i] = s[i]; 
     }
   }
 
   // Set up event listeners
   var events = ['complete', 'success', 'error'];
   for (i in events) {
-    if (typeof(vm[events[i]]) === 'function') this.on(events[i], vm[events[i]]);
+    if (typeof vm[events[i]] === 'function') this.on(events[i], vm[events[i]]);
   }
 
   // Interpreter
@@ -131,7 +131,7 @@ var brainfuck = module.exports = function(s) {
 
         case '[':
           ++xi;
-          xStack.push(xp++);
+          xStack.push(++xp);
           break;
 
         case ']':
