@@ -1,4 +1,4 @@
-var brainfuck = require('./brainfuck.js'),
+var brainfuck = require('../brainfuck.js'),
     assert    = require('assert');
 
 var execLimit = 1000;
