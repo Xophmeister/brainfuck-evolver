@@ -16,22 +16,23 @@ var brainfuck = module.exports = function(s) {
                 var done = new Date().getTime(),
                     secs = (done - ts) / 1000;
 
-                console.log(vm.name + ': Completed '.concat(
+                console.log(vm.name,
+                            ': Completed',
                             ops,
-                            ' operations in ',
+                            'operations in',
                             secs,
-                            ' seconds (',
-                            (ops / 1000) / secs,
-                            ' kops/s) using ',
+                            'seconds (' +
+                            (secs ? (ops / 1000) / secs : '∞'),
+                            'kops/s) using',
                             cells,
-                            ' memory cells'));
+                            'memory cells');
               },
     success:  function() {
-                console.log(vm.name + ': Execution Successful');
+                console.log(vm.name, ': Execution Successful');
               },
     error:    function(stack) {
                 // Stack is array of {status (String), fatal (Boolean)}
-                console.log(vm.name + ': Execution Failed');
+                console.log(vm.name, ': Execution Failed');
               }
   };
 
@@ -46,11 +47,11 @@ var brainfuck = module.exports = function(s) {
   var events = ['complete', 'success', 'error'],
       noop   = function() {};
   for (i in events) {
-    this.on(events[i], (typeof vm[events[i]] === 'function') ? vm[events[i]] : noop);
+    this.on(events[i], (typeof vm[events[i]] === 'function' &&  vm[events[i]]) || noop);
   }
 
   // Interpreter
-  this.exec = function(limit) {
+  this.exec = function(limit, callback) {
     // Initialise
     var d  = [0],                       // Data (expands rightwards)
         dp = 0;                         // Data pointer
@@ -71,7 +72,7 @@ var brainfuck = module.exports = function(s) {
       errors: new Array(),
       push:   function(text, fatal) {
                 this.errors.push({status: text, fatal: fatal});
-                var status = vm.name + ': \u001b' + (fatal?'[31mERROR ':'[34mWARNING ') + '\u001b[0m' + text;
+                var status = vm.name + ': \u001b' + (fatal ? '[31mERROR ' : '[34mWARNING ') + '\u001b[0m' + text;  // ANSI colours
 
                 if (fatal) {
                   console.error(status);
@@ -83,7 +84,7 @@ var brainfuck = module.exports = function(s) {
     };
  
     // Execute
-    while (xp < vm.src.length && (limit?xi < limit:true)) {
+    while (xp < vm.src.length && (limit ? xi < limit : true)) {
       switch (vm.src[xp]) {
         case '+':
           ++xi;
@@ -108,7 +109,7 @@ var brainfuck = module.exports = function(s) {
           if (--dp < 0) {
             errorStack.push('Beginning of file at ' + xp, true);
             me.emit('complete', xi, xStart, d.length);
-            return false;
+            callback(false);
           }
           ++xp;
           break;
@@ -146,7 +147,7 @@ var brainfuck = module.exports = function(s) {
             } else {
               errorStack.push('No return point from ' + xp, true);
               me.emit('complete', xi, xStart, d.length);
-              return false;
+              callback(false);
             }
           }
           break;
@@ -161,7 +162,10 @@ var brainfuck = module.exports = function(s) {
     // Finish up
     me.emit('success');
     me.emit('complete', xi, xStart, d.length);
-    return String.fromCharCode.apply(null, outStack);  // Returns '?' when out of Unicode bounds
+    callback({
+      text: String.fromCharCode.apply(null, outStack),  // Returns '?' when out of Unicode bounds
+      raw:  outStack
+    });
   };
 };
 
