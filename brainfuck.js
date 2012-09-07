@@ -43,9 +43,10 @@ var brainfuck = module.exports = function(s) {
   }
 
   // Set up event listeners
-  var events = ['complete', 'success', 'error'];
+  var events = ['complete', 'success', 'error'],
+      noop   = function() {};
   for (i in events) {
-    if (typeof vm[events[i]] === 'function') this.on(events[i], vm[events[i]]);
+    this.on(events[i], (typeof vm[events[i]] === 'function') ? vm[events[i]] : noop);
   }
 
   // Interpreter
@@ -160,9 +161,7 @@ var brainfuck = module.exports = function(s) {
     // Finish up
     me.emit('success');
     me.emit('complete', xi, xStart, d.length);
-    return outStack
-             .map(function(i) { return String.fromCharCode(i); })  // Returns '?' when out of Unicode bounds
-             .join('');
+    return String.fromCharCode.apply(null, outStack);  // Returns '?' when out of Unicode bounds
   };
 };
 
