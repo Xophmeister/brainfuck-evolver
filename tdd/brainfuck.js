@@ -4,35 +4,47 @@ var brainfuck = require('../brainfuck.js'),
 var execLimit = 1000;
 
 var helloWorld = new brainfuck({
-  name: 'hello.bf',
-  src:  '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.'
-});
-helloWorld.exec(execLimit, function(output) {
-  assert(output.text === 'Hello World!\n', 'Failed Hello World Test');
+  name:   'hello.bf',
+  src:    '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
+
+  output: function(v) {
+            assert(v.text === 'Hello World!\n', 'Failed Hello World Test');
+          }
 });
 
 var badSyntax = new brainfuck({
-  src: '+++++[>+++++++++++++<-]>.]'
-});
-badSyntax.exec(execLimit, function(output) {
-  // assert(output === false, 'Failed Bad Syntax Test');
+  src:    '+++++[>+++++++++++++<-]>.]',
+
+  output: function(v) {
+            assert(v === null, 'Failed Bad Syntax Test');
+          }
 });
 
 var BOF = new brainfuck({
-  name: 'BOF Test',
-  src:  '<'
-});
-BOF.exec(execLimit, function(output) {
-  // assert(output === false, 'Failed BOF Test');
+  name:   'BOF Test',
+  src:    '<',
+
+  output: function(v) {
+            assert(v === null, 'Failed BOF Test');
+          }
 });
 
 var innerLoop = new brainfuck({
-  name:  'Inner Loop and Input Test',
-  src:   '+++[>+++[>,.<-]<-]',
-  input: 'brainfuck'
-});
-innerLoop.exec(execLimit, function(output) {
-  assert(output.text === 'brainfuck', 'Failed Inner Loop and Input Test');
+  name:   'Inner Loop and Input Test',
+  src:    '+++[>+++[>,.<-]<-]',
+
+  output: function(v) {
+            assert(v.text === 'brainfuck', 'Failed Inner Loop and Input Test');
+          }
 });
 
-console.log('\nPassed!');
+var tests = [{bf: helloWorld, input: null},
+             {bf: badSyntax,  input: null},
+             {bf: BOF,        input: null},
+             {bf: innerLoop,  input: 'brainfuck'}];
+
+for (i = 0; i < tests.length; ++i) {
+  tests[i].bf.exec(tests[i].input, execLimit);
+}
+
+if (i === tests.length) console.log('\nAll Tests Completed!');

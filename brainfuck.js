@@ -8,16 +8,16 @@ var brainfuck = module.exports = function(s) {
   // Settings for VM
   var vm = {
     name:     'Anonymous',
-
     src:      '',
-    input:    '',
 
+    output:   function(value) {
+                console.log(vm.name + ':', value);
+              },
     complete: function(ops, ts, cells) {
                 var done = new Date().getTime(),
                     secs = (done - ts) / 1000;
 
-                console.log(vm.name,
-                            ': Completed',
+                console.log(vm.name + ': Completed',
                             ops,
                             'operations in',
                             secs,
@@ -28,11 +28,11 @@ var brainfuck = module.exports = function(s) {
                             'memory cells');
               },
     success:  function() {
-                console.log(vm.name, ': Execution Successful');
+                console.log(vm.name + ': Execution Successful');
               },
     error:    function(stack) {
                 // Stack is array of {status (String), fatal (Boolean)}
-                console.log(vm.name, ': Execution Failed');
+                console.log(vm.name + ': Execution Failed');
               }
   };
 
@@ -44,14 +44,14 @@ var brainfuck = module.exports = function(s) {
   }
 
   // Set up event listeners
-  var events = ['complete', 'success', 'error'],
+  var events = ['output', 'complete', 'success', 'error'],
       noop   = function() {};
-  for (i in events) {
+  for (i = 0; i < events.length; ++i) {
     this.on(events[i], (typeof vm[events[i]] === 'function' &&  vm[events[i]]) || noop);
   }
 
   // Interpreter
-  this.exec = function(limit, callback) {
+  this.exec = function(input, limit) {
     // Initialise
     var d  = [0],                       // Data (expands rightwards)
         dp = 0;                         // Data pointer
@@ -61,9 +61,9 @@ var brainfuck = module.exports = function(s) {
         xi = 0,                         // Operation count
         xStart = new Date().getTime();  // Execution start time;
 
-    var inStack = vm.input              // String input is converted into a numeric stack:
+    var inStack = (input || '')         // String input is converted into a numeric stack: 
                     .split('')          // e.g., 'foo' > [111, 111, 102]
-                    .reverse()
+                    .reverse() 
                     .map(function(i) { return i.charCodeAt(0); });
 
     var outStack = new Array();
@@ -77,6 +77,8 @@ var brainfuck = module.exports = function(s) {
                 if (fatal) {
                   console.error(status);
                   me.emit('error', this.errors);
+                  me.emit('complete', xi, xStart, d.length);
+                  me.emit('output', null);
                 } else {
                   console.warn(status);
                 }
@@ -100,7 +102,7 @@ var brainfuck = module.exports = function(s) {
 
         case '>':
           ++xi;
-          if (++dp == d.length) d.push(0);
+          if (++dp === d.length) d.push(0);
           ++xp;
           break;
 
@@ -108,8 +110,7 @@ var brainfuck = module.exports = function(s) {
           ++xi;
           if (--dp < 0) {
             errorStack.push('Beginning of file at ' + xp, true);
-            me.emit('complete', xi, xStart, d.length);
-            callback(false);
+            return false;
           }
           ++xp;
           break;
@@ -146,8 +147,7 @@ var brainfuck = module.exports = function(s) {
               xp = jump;
             } else {
               errorStack.push('No return point from ' + xp, true);
-              me.emit('complete', xi, xStart, d.length);
-              callback(false);
+              return false;
             }
           }
           break;
@@ -162,10 +162,12 @@ var brainfuck = module.exports = function(s) {
     // Finish up
     me.emit('success');
     me.emit('complete', xi, xStart, d.length);
-    callback({
+    me.emit('output', {
       text: String.fromCharCode.apply(null, outStack),  // Returns '?' when out of Unicode bounds
       raw:  outStack
     });
+
+    return true;
   };
 };
 
