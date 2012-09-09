@@ -6,7 +6,7 @@ var execLimit = 1000;
 var helloWorld = new brainfuck({
   name:   'hello.bf',
   src:    '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
-
+  
   output: function(v) {
             assert(v.text === 'Hello World!\n', 'Failed Hello World Test');
           }

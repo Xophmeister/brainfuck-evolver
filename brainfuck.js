@@ -10,6 +10,8 @@ var brainfuck = module.exports = function(s) {
     name:     'Anonymous',
     src:      '',
 
+    timeout:  2000,
+
     output:   function(value) {
                 console.log(vm.name + ':', value);
               },
@@ -20,9 +22,9 @@ var brainfuck = module.exports = function(s) {
                 console.log(vm.name + ': Completed',
                             ops,
                             'operations in',
-                            secs,
+                            secs.toPrecision(3),
                             'seconds (' +
-                            (secs ? (ops / 1000) / secs : '∞'),
+                            (secs ? ((ops / 1000) / secs).toPrecision(3) : '∞'),
                             'kops/s) using',
                             cells,
                             'memory cells');
@@ -63,7 +65,6 @@ var brainfuck = module.exports = function(s) {
 
     var inStack = (input || '')         // String input is converted into a numeric stack: 
                     .split('')          // e.g., 'foo' > [111, 111, 102]
-                    .reverse() 
                     .map(function(i) { return i.charCodeAt(0); });
 
     var outStack = new Array();
@@ -84,7 +85,7 @@ var brainfuck = module.exports = function(s) {
                 }
               }
     };
- 
+     
     // Execute
     while (xp < vm.src.length && (limit ? xi < limit : true)) {
       switch (vm.src[xp]) {
@@ -123,7 +124,7 @@ var brainfuck = module.exports = function(s) {
 
         case ',':
           ++xi;
-          if (get = inStack.pop()) {
+          if (get = inStack.shift()) {
             d[dp] = get;
           } else {
             d[dp] = 0;
@@ -155,8 +156,16 @@ var brainfuck = module.exports = function(s) {
         default:
           ++xp;
       }
+
+      // Check for execution timeout (fatal)
+      var xTime = new Date().getTime();
+      if (vm.timeout > 0 && xTime - xStart > vm.timeout) {
+        errorStack.push('Execution timeout', true);
+        return false
+      }
     }
 
+    // Check for execution limit (not fatal)
     if (limit && xi >= limit) errorStack.push('Execution limit reached', false);
 
     // Finish up
