@@ -11,8 +11,11 @@ var brainfuck = module.exports = function(s) {
     src:      '',
 
     timeout:  2000,
+    limit:    null,
 
     output:   function(value) {
+                // If execution failed:    value = null
+                // If execution succeeded: value = {text: String, raw: Array}
                 console.log(vm.name + ':', value);
               },
     complete: function(ops, ts, cells) {
@@ -33,7 +36,7 @@ var brainfuck = module.exports = function(s) {
                 console.log(vm.name + ': Execution Successful');
               },
     error:    function(stack) {
-                // Stack is array of {status (String), fatal (Boolean)}
+                // Stack is array of {status: String, fatal: Boolean}
                 console.log(vm.name + ': Execution Failed');
               }
   };
@@ -53,7 +56,7 @@ var brainfuck = module.exports = function(s) {
   }
 
   // Interpreter
-  this.exec = function(input, limit) {
+  this.run = function(input) {
     // Initialise
     var d  = [0],                       // Data (expands rightwards)
         dp = 0;                         // Data pointer
@@ -63,8 +66,8 @@ var brainfuck = module.exports = function(s) {
         xi = 0,                         // Operation count
         xStart = new Date().getTime();  // Execution start time;
 
-    var inStack = (input || '')         // String input is converted into a numeric stack: 
-                    .split('')          // e.g., 'foo' > [111, 111, 102]
+    var inStack = (input || '')         // String input is converted into array of Unicode code points:
+                    .split('')          // e.g., 'foo' > [102, 111, 111]
                     .map(function(i) { return i.charCodeAt(0); });
 
     var outStack = new Array();
@@ -73,21 +76,46 @@ var brainfuck = module.exports = function(s) {
       errors: new Array(),
       push:   function(text, fatal) {
                 this.errors.push({status: text, fatal: fatal});
-                var status = vm.name + ': \u001b' + (fatal ? '[31mERROR ' : '[34mWARNING ') + '\u001b[0m' + text;  // ANSI colours
+                var status = vm.name + ': \u001b[3' + (fatal ? '1mERROR ' : '4mWARNING ') + '\u001b[0m' + text;  // ANSI colours
 
                 if (fatal) {
                   console.error(status);
-                  me.emit('error', this.errors);
-                  me.emit('complete', xi, xStart, d.length);
-                  me.emit('output', null);
                 } else {
                   console.warn(status);
                 }
               }
     };
-     
-    // Execute
-    while (xp < vm.src.length && (limit ? xi < limit : true)) {
+    
+    function scheduler() {
+      var interrupt = false,
+          now       = new Date().getTime();
+      
+      // Check for execution timeout (fatal)
+      if (vm.timeout && now - xStart >= vm.timeout) {
+        errorStack.push('Execution timeout', true);
+        interrupt = true;
+      }
+      delete now;
+
+      // Check for execution limit (not fatal)
+      if (vm.limit && xi >= vm.limit) {
+        errorStack.push('Execution limit reached', false);
+        interrupt = true;
+      }
+
+      // Check for invalid state (fatal)
+      if (dp < 0 || xp === undefined) {
+        errorStack.push('Invalid state', true);
+        interrupt = true;
+      }
+
+      // Fetch Execute
+      if (xp < vm.src.length && !interrupt) {
+        fetchExecute(scheduler);
+      }
+    }
+
+    function fetchExecute(callback) {
       switch (vm.src[xp]) {
         case '+':
           ++xi;
@@ -109,10 +137,7 @@ var brainfuck = module.exports = function(s) {
 
         case '<':
           ++xi;
-          if (--dp < 0) {
-            errorStack.push('Beginning of file at ' + xp, true);
-            return false;
-          }
+          --dp;
           ++xp;
           break;
 
@@ -128,7 +153,7 @@ var brainfuck = module.exports = function(s) {
             d[dp] = get;
           } else {
             d[dp] = 0;
-            errorStack.push('Input exhausted at ' + xp, false);
+            errorStack.push('Input exhausted', false);
           }
           ++xp;
           break;
@@ -144,12 +169,7 @@ var brainfuck = module.exports = function(s) {
             xStack.pop();
             ++xp;
           } else {
-            if (jump = xStack.slice(-1)[0]) {
-              xp = jump;
-            } else {
-              errorStack.push('No return point from ' + xp, true);
-              return false;
-            }
+            xp = xStack.slice(-1)[0];
           }
           break;
 
@@ -157,26 +177,28 @@ var brainfuck = module.exports = function(s) {
           ++xp;
       }
 
-      // Check for execution timeout (fatal)
-      var xTime = new Date().getTime();
-      if (vm.timeout > 0 && xTime - xStart > vm.timeout) {
-        errorStack.push('Execution timeout', true);
-        return false
-      }
+      callback();
     }
 
-    // Check for execution limit (not fatal)
-    if (limit && xi >= limit) errorStack.push('Execution limit reached', false);
+    // Let's go, bitches!
+    fetchExecute(scheduler);
 
     // Finish up
-    me.emit('success');
     me.emit('complete', xi, xStart, d.length);
-    me.emit('output', {
-      text: String.fromCharCode.apply(null, outStack),  // Returns '?' when out of Unicode bounds
-      raw:  outStack
-    });
+    if (errorStack.errors.length && errorStack.errors.slice(-1)[0].fatal) {
+      me.emit('error', errorStack.errors);
+      me.emit('output', null);
 
-    return true;
+      return false
+    } else {
+      me.emit('success');
+      me.emit('output', {
+        text: String.fromCharCode.apply(null, outStack),  // Returns '?' when out of Unicode bounds
+        raw:  outStack
+      });
+
+      return true;
+    }
   };
 };
 
