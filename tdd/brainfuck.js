@@ -10,7 +10,7 @@ var helloWorld = new brainfuck({
   limit:  execLimit,
   
   output: function(v) {
-            assert(v.text === 'Hello World!\n', 'Failed Hello World Test');
+            assert(v && v.text === 'Hello World!\n', 'Failed Hello World Test');
           }
 });
 
@@ -42,7 +42,7 @@ var innerLoop = new brainfuck({
   limit:  execLimit,
 
   output: function(v) {
-            assert(v.text === 'brainfuck', 'Failed Inner Loop and Input Test');
+            assert(v && v.text === 'brainfuck', 'Failed Inner Loop and Input Test');
           }
 });
 
@@ -66,5 +66,3 @@ var tests = [{bf: helloWorld, input: null},
 for (i = 0; i < tests.length; ++i) {
   tests[i].bf.run(tests[i].input);
 }
-
-if (i === tests.length) console.log('\nAll Tests Completed!');
