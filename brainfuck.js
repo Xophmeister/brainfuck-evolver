@@ -11,7 +11,7 @@ var brainfuck = module.exports = function(s) {
     src:      '',
 
     timeout:  2000,
-    limit:    null,
+    limit:    0,
 
     output:   function(value) {
                 // If execution failed:    value = null
@@ -43,21 +43,26 @@ var brainfuck = module.exports = function(s) {
   
   // Override interface defaults, if set
   if (s) {
-    for (i in s) {
-      if (s.hasOwnProperty(i)) os[i] = s[i]; 
+    for (i in os) {
+      if (os.hasOwnProperty(i) && s[i]) {
+        if (typeof os[i] === typeof s[i]) {
+          os[i] = s[i];
+        } else {
+          console.warn(os.name + ':', i, 'is wrong type; expecting', typeof os[i]);
+        }
+      }
     }
   }
   
   // Setup VM
   var vm = {
     interrupt: false,
-    scheduler: null,
+    running:   false,
 
     data:      [0],
     dp:        0,
 
     xp:        0,
-    xpLast:    null,
 
     count:     0,
     start:     null,
@@ -79,17 +84,21 @@ var brainfuck = module.exports = function(s) {
                            } else {
                              console.warn(text);
                            }
+                         },
+                 fatal:  function() {
+                           return this.errors.reduce(function(i, j) { return i || j.fatal; }, false);
                          }
                },
 
     execute:   function() {
                  if (vm.interrupt) {  // Process interrupt
-                   vm.scheduler = clearInterval(vm.scheduler);
+                   clearTimeout(vm.running);
+                   vm.running = false;
                    me.emit('complete', vm.count, vm.start, vm.data.length);
 
                    // If top error is fatal, then execution failed
                    // Otherwise, we're good :)
-                   if (vm.errStack.errors.length && vm.errStack.errors.slice(-1)[0].fatal) {
+                   if (vm.errStack.errors.length && vm.errStack.fatal()) {
                      me.emit('error', vm.errStack.errors);
                      me.emit('output', null);
                    } else {
@@ -100,9 +109,7 @@ var brainfuck = module.exports = function(s) {
                      });
                    }
 
-                 } else if (vm.xp !== vm.xpLast) {  // Fetch-Execute
-                   vm.xpLast = vm.xp;
-
+                 } else {  // Fetch-Execute
                    switch (os.src[vm.xp]) {
                      case '+':
                        ++vm.count;
@@ -169,19 +176,16 @@ var brainfuck = module.exports = function(s) {
                      default:
                        ++vm.xp;
                    }
-                 }
-                 
-                 // Process other exceptions
-                 if (os.timeout) {  // Execution time out (fatal)
-                   var now = new Date().getTime();
-                   if (now - vm.start >= os.timeout) {
-                     vm.errStack.push('Execution timeout', null, true);
+
+                   // What next?...
+                   if (os.limit && vm.count >= os.limit) {  // Execution limit (non-fatal)
+                     vm.errStack.push('Execution limit', null, false);
+                     me.emit('interrupt');
+                   } else if (vm.xp >= os.src.length) {  // Execution completed
+                     me.emit('interrupt');
+                   } else {
+                     process.nextTick(vm.execute);
                    }
-                 } else if (os.limit && vm.count >= os.limit) {  // Execution limit (non-fatal)
-                   vm.errStack.push('Execution limit', null, false);
-                   me.emit('interrupt');
-                 } else if (vm.xp >= os.src.length) {  // Execution completed
-                   me.emit('interrupt');
                  }
                }
   };
@@ -196,7 +200,7 @@ var brainfuck = module.exports = function(s) {
 
   // Boot sequence
   this.run = function(input) {
-    if (vm.scheduler) {
+    if (vm.running) {
       console.warn(os.name + ': \u001b[34mWARNING\u001b[0m Already Running');
     } else {
       vm.inStack = (input || '').split('')                  // String input is converted into array of Unicode code points:
@@ -205,8 +209,15 @@ var brainfuck = module.exports = function(s) {
                                  });
 
       vm.start = new Date().getTime();
+      if (os.timeout) {                  
+        vm.running = setTimeout(function() {
+          vm.errStack.push('Execution timeout', null, true);
+        }, os.timeout);
+      } else {
+        vm.running = true;
+      }
 
-      vm.scheduler = setInterval(vm.execute, 0);
+      process.nextTick(vm.execute);
     }
   };
 };
