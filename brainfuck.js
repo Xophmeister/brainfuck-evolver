@@ -41,13 +41,14 @@ var brainfuck = module.exports = function(s) {
               }
   };
   
-  // Override interface defaults, if set
+  // Override interface defaults, if set correctly
   if (s) {
     for (i in os) {
       if (os.hasOwnProperty(i) && s[i]) {
         if (typeof os[i] === typeof s[i]) {
           os[i] = s[i];
         } else {
+          // Fall back to default
           console.warn(os.name + ':', i, 'is wrong type; expecting', typeof os[i]);
         }
       }
@@ -80,7 +81,7 @@ var brainfuck = module.exports = function(s) {
 
                            if (fatal) {
                              console.error(text);
-                             me.emit('interrupt');
+                             vm.interrupt = true;
                            } else {
                              console.warn(text);
                            }
@@ -91,12 +92,11 @@ var brainfuck = module.exports = function(s) {
                },
 
     execute:   function() {
-                 if (vm.interrupt) {  // Process interrupt
-                   clearTimeout(vm.running);
-                   vm.running = false;
+                 if (vm.interrupt && vm.running) {  // Process interrupt
+                   vm.running = clearTimeout(vm.running);
                    me.emit('complete', vm.count, vm.start, vm.data.length);
 
-                   // If top error is fatal, then execution failed
+                   // If we experience a fatal exception, then execution failed :(
                    // Otherwise, we're good :)
                    if (vm.errStack.errors.length && vm.errStack.fatal()) {
                      me.emit('error', vm.errStack.errors);
@@ -109,83 +109,84 @@ var brainfuck = module.exports = function(s) {
                      });
                    }
 
-                 } else {  // Fetch-Execute
-                   switch (os.src[vm.xp]) {
-                     case '+':
-                       ++vm.count;
-                       ++vm.data[vm.dp];
-                       ++vm.xp;
-                       break;
-
-                     case '-':
-                       ++vm.count;
-                       --vm.data[vm.dp];
-                       ++vm.xp;
-                       break;
-
-                     case '>':
-                       ++vm.count;
-                       if (++vm.dp === vm.data.length) vm.data.push(0);
-                       ++vm.xp;
-                       break;
-
-                     case '<':
-                       ++vm.count;
-                       if (--vm.dp < 0) {
-                         vm.errStack.push('Beginning of file', vm.xp, true);
-                       }
-                       ++vm.xp;
-                       break;
-
-                     case '.':
-                       ++vm.count;
-                       vm.outStack.push(vm.data[vm.dp]);
-                       ++vm.xp;
-                       break;
-
-                     case ',':
-                       ++vm.count;
-                       if (get = vm.inStack.shift()) {
-                         vm.data[vm.dp] = get;
-                       } else {
-                         vm.data[vm.dp] = 0;
-                         vm.errStack.push('Input exhausted', vm.xp, false);
-                       }
-                       ++vm.xp;
-                       break;
-
-                     case '[':
-                       ++vm.count;
-                       vm.jmpStack.push(++vm.xp);
-                       break;
-
-                     case ']':
-                       ++vm.count;
-                       if (vm.data[vm.dp] == 0) {
-                         vm.jmpStack.pop();
-                         ++vm.xp;
-                       } else {
-                         if (jump = vm.jmpStack.slice(-1)[0]) {
-                           vm.xp = jump;
-                         } else {
-                           vm.errStack.push('No return point', vm.xp, true);
-                         }
-                       }
-                       break;
-
-                     default:
-                       ++vm.xp;
-                   }
-
-                   // What next?...
+                 } else {
+                   // Capture interrupting conditions 
                    if (os.limit && vm.count >= os.limit) {  // Execution limit (non-fatal)
                      vm.errStack.push('Execution limit', null, false);
-                     me.emit('interrupt');
+                     vm.interrupt = true;
+
                    } else if (vm.xp >= os.src.length) {  // Execution completed
-                     me.emit('interrupt');
-                   } else {
-                     process.nextTick(vm.execute);
+                     vm.interrupt = true;
+
+                   } else {  // Fetch-Execute
+                     switch (os.src[vm.xp]) {
+                       case '+':
+                         ++vm.count;
+                         ++vm.data[vm.dp];
+                         ++vm.xp;
+                         break;
+
+                       case '-':
+                         ++vm.count;
+                         --vm.data[vm.dp];
+                         ++vm.xp;
+                         break;
+
+                       case '>':
+                         ++vm.count;
+                         if (++vm.dp === vm.data.length) vm.data.push(0);
+                         ++vm.xp;
+                         break;
+
+                       case '<':
+                         ++vm.count;
+                         if (--vm.dp < 0) {
+                           vm.errStack.push('Beginning of file', vm.xp, true);
+                         }
+                         ++vm.xp;
+                         break;
+
+                       case '.':
+                         ++vm.count;
+                         vm.outStack.push(vm.data[vm.dp]);
+                         ++vm.xp;
+                         break;
+
+                       case ',':
+                         ++vm.count;
+                         if (get = vm.inStack.shift()) {
+                           vm.data[vm.dp] = get;
+                         } else {
+                           vm.data[vm.dp] = 0;
+                           vm.errStack.push('Input exhausted', vm.xp, false);
+                         }
+                         ++vm.xp;
+                         break;
+
+                       case '[':
+                         ++vm.count;
+                         vm.jmpStack.push(++vm.xp);
+                         break;
+
+                       case ']':
+                         ++vm.count;
+                         if (vm.data[vm.dp] == 0) {
+                           vm.jmpStack.pop();
+                           ++vm.xp;
+                         } else {
+                           if (jump = vm.jmpStack.slice(-1)[0]) {
+                             vm.xp = jump;
+                           } else {
+                             vm.errStack.push('No return point', vm.xp, true);
+                           }
+                         }
+                         break;
+
+                       default:
+                         ++vm.xp;
+                     }
                    }
+                   process.nextTick(vm.execute);
                  }
                }
   };
@@ -196,7 +197,6 @@ var brainfuck = module.exports = function(s) {
   for (i = 0; i < events.length; ++i) {
     this.on(events[i], (typeof os[events[i]] === 'function' &&  os[events[i]]) || noop);
   }
-  this.on('interrupt', function() { vm.interrupt = true; });
 
   // Boot sequence
   this.run = function(input) {
@@ -211,12 +211,12 @@ var brainfuck = module.exports = function(s) {
       vm.start = new Date().getTime();
       if (os.timeout) {                  
         vm.running = setTimeout(function() {
-          vm.errStack.push('Execution timeout', null, true);
-        }, os.timeout);
+                                  vm.errStack.push('Execution timeout', null, true);  // Global timeout (fatal)
+                                }, os.timeout);
       } else {
         vm.running = true;
       }
-
+      
       process.nextTick(vm.execute);
     }
   };

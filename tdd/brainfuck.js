@@ -50,7 +50,7 @@ var timeOut = new brainfuck({
   name:   'Timeout Test',
   src:    '[+]',
 
-  limit:  null,
+  limit:  0,
 
   output: function(v) {
             assert(v === null, 'Failed Timeout Test');
