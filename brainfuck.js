@@ -192,11 +192,8 @@ var brainfuck = module.exports = function(s) {
   };
 
   // Set up event listeners
-  var events = ['output', 'complete', 'success', 'error'],
-      noop   = function() {};
-  for (i = 0; i < events.length; ++i) {
-    this.on(events[i], (typeof os[events[i]] === 'function' &&  os[events[i]]) || noop);
-  }
+  var events = ['output', 'complete', 'success', 'error'];
+  for (i = 0; i < events.length; ++i) { this.on(events[i], os[events[i]]); }
 
   // Boot sequence
   this.run = function(input) {
