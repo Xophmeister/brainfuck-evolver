@@ -3,6 +3,7 @@
 // MIT License
 
 var brainfuck = module.exports = function(s) {
+  if (!(this instanceof brainfuck)) return new brainfuck(s);
   var me = this;
 
   // Settings for VM interface
@@ -55,25 +56,33 @@ var brainfuck = module.exports = function(s) {
     }
   }
   
+  // Set up event listeners
+  var events = ['output', 'complete', 'success', 'error'];
+  for (i = 0; i < events.length; ++i) { this.on(events[i], os[events[i]]); }
+
   // Setup VM
   var vm = {
-    interrupt: false,
-    running:   false,
+    boot:    function(input) {
+               // Initialise VM
+               vm.interrupt = false;
 
-    data:      [0],
-    dp:        0,
+               vm.data = [0];
+               vm.dp = 0;
 
-    xp:        0,
+               vm.xp = 0;
 
-    count:     0,
-    start:     null,
+               vm.count = 0;
+               vm.start = new Date().getTime();
 
-    jmpStack:  [],
+               vm.jmpStack = [];
 
-    inStack:   [],
-    outStack:  [],
+               vm.outStack = [];
+               vm.inStack = (input || '').split('')                  // String input is converted into array of Unicode code points:
+                                         .map(function(i) {          // e.g., 'foo' > [102, 111, 111]
+                                            return i.charCodeAt(0);
+                                          });
 
-    errStack:  {
+               vm.errStack = {
                  errors: [],
                  push:   function(status, pointer, fatal) {
                            this.errors.push({status: status, pointer: pointer, fatal: fatal});
@@ -89,132 +98,126 @@ var brainfuck = module.exports = function(s) {
                  fatal:  function() {
                            return this.errors.reduce(function(i, j) { return i || j.fatal; }, false);
                          }
-               },
+               };
 
-    execute:   function() {
-                 if (vm.interrupt && vm.running) {  // Process interrupt
-                   vm.running = clearTimeout(vm.running);
-                   me.emit('complete', vm.count, vm.start, vm.data.length);
-
-                   // If we experience a fatal exception, then execution failed :(
-                   // Otherwise, we're good :)
-                   if (vm.errStack.errors.length && vm.errStack.fatal()) {
-                     me.emit('error', vm.errStack.errors);
-                     me.emit('output', null);
-                   } else {
-                     me.emit('success');
-                     me.emit('output', {
-                       text: String.fromCharCode.apply(null, vm.outStack),  // Returns '?' when out of Unicode bounds
-                       raw:  vm.outStack
-                     });
-                   }
-
-                 } else {
-                   // Capture interrupting conditions 
-                   if (os.limit && vm.count >= os.limit) {  // Execution limit (non-fatal)
-                     vm.errStack.push('Execution limit', null, false);
-                     vm.interrupt = true;
-
-                   } else if (vm.xp >= os.src.length) {  // Execution completed
-                     vm.interrupt = true;
-
-                   } else {  // Fetch-Execute
-                     switch (os.src[vm.xp]) {
-                       case '+':
-                         ++vm.count;
-                         ++vm.data[vm.dp];
-                         ++vm.xp;
-                         break;
-
-                       case '-':
-                         ++vm.count;
-                         --vm.data[vm.dp];
-                         ++vm.xp;
-                         break;
-
-                       case '>':
-                         ++vm.count;
-                         if (++vm.dp === vm.data.length) vm.data.push(0);
-                         ++vm.xp;
-                         break;
-
-                       case '<':
-                         ++vm.count;
-                         if (--vm.dp < 0) {
-                           vm.errStack.push('Beginning of file', vm.xp, true);
-                         }
-                         ++vm.xp;
-                         break;
-
-                       case '.':
-                         ++vm.count;
-                         vm.outStack.push(vm.data[vm.dp]);
-                         ++vm.xp;
-                         break;
-
-                       case ',':
-                         ++vm.count;
-                         if (get = vm.inStack.shift()) {
-                           vm.data[vm.dp] = get;
-                         } else {
-                           vm.data[vm.dp] = 0;
-                           vm.errStack.push('Input exhausted', vm.xp, false);
-                         }
-                         ++vm.xp;
-                         break;
-
-                       case '[':
-                         ++vm.count;
-                         vm.jmpStack.push(++vm.xp);
-                         break;
-
-                       case ']':
-                         ++vm.count;
-                         if (vm.data[vm.dp] == 0) {
-                           vm.jmpStack.pop();
-                           ++vm.xp;
-                         } else {
-                           if (jump = vm.jmpStack.slice(-1)[0]) {
-                             vm.xp = jump;
-                           } else {
-                             vm.errStack.push('No return point', vm.xp, true);
-                           }
-                         }
-                         break;
-
-                       default:
-                         ++vm.xp;
-                     }
-                   }
-                   process.nextTick(vm.execute);
-                 }
+               if (os.timeout) {                  
+                 vm.running = setTimeout(function() {
+                                           vm.errStack.push('Execution timeout', null, true);  // Global timeout (fatal)
+                                         }, os.timeout);
+               } else {
+                 vm.running = true;
                }
-  };
 
-  // Set up event listeners
-  var events = ['output', 'complete', 'success', 'error'];
-  for (i = 0; i < events.length; ++i) { this.on(events[i], os[events[i]]); }
+               // Let's go, bitches!
+               process.nextTick(vm.execute);
+             },
+
+    execute: function() {
+               if (vm.interrupt && vm.running) {  // Process interrupt
+                 vm.running = clearTimeout(vm.running);
+                 me.emit('complete', vm.count, vm.start, vm.data.length);
+
+                 // If we experience a fatal exception, then execution failed :(
+                 // Otherwise, we're good :)
+                 if (vm.errStack.errors.length && vm.errStack.fatal()) {
+                   me.emit('error', vm.errStack.errors);
+                   me.emit('output', null);
+                 } else {
+                   me.emit('success');
+                   me.emit('output', {
+                     text: String.fromCharCode.apply(null, vm.outStack),  // Returns '?' when out of Unicode bounds
+                     raw:  vm.outStack
+                   });
+                 }
+
+               } else {
+                 // Capture interrupting conditions 
+                 if (os.limit && vm.count >= os.limit) {  // Execution limit (non-fatal)
+                   vm.errStack.push('Execution limit', null, false);
+                   vm.interrupt = true;
+
+                 } else if (vm.xp >= os.src.length) {  // Execution completed
+                   vm.interrupt = true;
+
+                 } else {  // Fetch-Execute
+                   switch (os.src[vm.xp]) {
+                     case '+':
+                       ++vm.count;
+                       ++vm.data[vm.dp];
+                       ++vm.xp;
+                       break;
+
+                     case '-':
+                       ++vm.count;
+                       --vm.data[vm.dp];
+                       ++vm.xp;
+                       break;
+
+                     case '>':
+                       ++vm.count;
+                       if (++vm.dp === vm.data.length) vm.data.push(0);
+                       ++vm.xp;
+                       break;
+
+                     case '<':
+                       ++vm.count;
+                       if (--vm.dp < 0) {
+                         vm.errStack.push('Beginning of file', vm.xp, true);
+                       }
+                       ++vm.xp;
+                       break;
+
+                     case '.':
+                       ++vm.count;
+                       vm.outStack.push(vm.data[vm.dp]);
+                       ++vm.xp;
+                       break;
+
+                     case ',':
+                       ++vm.count;
+                       if (get = vm.inStack.shift()) {
+                         vm.data[vm.dp] = get;
+                       } else {
+                         vm.data[vm.dp] = 0;
+                         vm.errStack.push('Input exhausted', vm.xp, false);
+                       }
+                       ++vm.xp;
+                       break;
+
+                     case '[':
+                       ++vm.count;
+                       vm.jmpStack.push(++vm.xp);
+                       break;
+
+                     case ']':
+                       ++vm.count;
+                       if (vm.data[vm.dp] == 0) {
+                         vm.jmpStack.pop();
+                         ++vm.xp;
+                       } else {
+                         if (jump = vm.jmpStack.slice(-1)[0]) {
+                           vm.xp = jump;
+                         } else {
+                           vm.errStack.push('No return point', vm.xp, true);
+                         }
+                       }
+                       break;
+
+                     default:
+                       ++vm.xp;
+                   }
+                 }
+                 process.nextTick(vm.execute);
+               }
+             }
+  };
 
   // Boot sequence
   this.run = function(input) {
     if (vm.running) {
       console.warn(os.name + ': \u001b[34mWARNING\u001b[0m Already Running');
     } else {
-      vm.inStack = (input || '').split('')                  // String input is converted into array of Unicode code points:
-                                .map(function(i) {          // e.g., 'foo' > [102, 111, 111]
-                                   return i.charCodeAt(0);
-                                 });
-
-      vm.start = new Date().getTime();
-      if (os.timeout) {                  
-        vm.running = setTimeout(function() {
-                                  vm.errStack.push('Execution timeout', null, true);  // Global timeout (fatal)
-                                }, os.timeout);
-      } else {
-        vm.running = true;
-      }
-      
-      process.nextTick(vm.execute);
+      vm.boot(input);
     }
   };
 };

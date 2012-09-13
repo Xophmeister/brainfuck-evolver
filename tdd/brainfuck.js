@@ -3,7 +3,7 @@ var brainfuck = require('../brainfuck.js'),
 
 var execLimit = 1000;
 
-var helloWorld = new brainfuck({
+var helloWorld = brainfuck({
   name:   'hello.bf',
   src:    '++++++++++ This text will be ignored! [>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.',
 
@@ -14,7 +14,7 @@ var helloWorld = new brainfuck({
           }
 });
 
-var badSyntax = new brainfuck({
+var badSyntax = brainfuck({
   src:    '+++++[>+++++++++++++<-]>.]',
 
   limit:  execLimit,
@@ -24,7 +24,7 @@ var badSyntax = new brainfuck({
           }
 });
 
-var BOF = new brainfuck({
+var BOF = brainfuck({
   name:   'BOF Test',
   src:    '<',
 
@@ -35,7 +35,7 @@ var BOF = new brainfuck({
           }
 });
 
-var innerLoop = new brainfuck({
+var innerLoop = brainfuck({
   name:   'Inner Loop and Input Test',
   src:    '+++[>+++[>,.<-]<-]',
 
@@ -46,7 +46,7 @@ var innerLoop = new brainfuck({
           }
 });
 
-var timeOut = new brainfuck({
+var timeOut = brainfuck({
   name:   'Timeout Test',
   src:    '[+]',
 

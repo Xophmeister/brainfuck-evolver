@@ -45,9 +45,12 @@ the following keys:
   Boolean}`) passed as the argument.
 
 Note that the callback events are all set to reasonable defaults,
-outputting to the console appropriately.
+outputting to the console appropriately. Moreover, these are set up as
+events via the node.js Event Emitter object, so you can define multiple
+callbacks using the `on` function (e.g., `brainfuck.on('error',
+someFunction)`).
 
-Possible exceptions are:
+Possible runtime exceptions are:
 
 * Global timeout *Fatal*
 * Beginning of file *Fatal*: When the data pointer attempts to move out
