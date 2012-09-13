@@ -47,8 +47,8 @@ the following keys:
 Note that the callback events are all set to reasonable defaults,
 outputting to the console appropriately. Moreover, these are set up as
 events via the node.js Event Emitter object, so you can define multiple
-callbacks using the `on` function (e.g., `brainfuck.on('error',
-someFunction)`).
+callbacks using the `on` function (e.g., `.on('error', someFunction)`,
+etc.).
 
 Possible runtime exceptions are:
 
@@ -56,7 +56,7 @@ Possible runtime exceptions are:
 * Beginning of file *Fatal*: When the data pointer attempts to move out
   of bounds, leftwards.
 * No return point *Fatal*: When there is a mismatched jump command in
-  the programme source.
+  the programme source (determined at runtime).
 * Reached execution limit *Non-Fatal*: Will terminate gracefully and
   return whatever output exists.
 * End of file *Non-Fatal*: When the input register has been fully
@@ -69,7 +69,7 @@ input register.
 ### Hello World Example
    
     var brainfuck  = require('./brainfuck.js'),
-        helloWorld = new brainfuck({
+        helloWorld = brainfuck({
                        name: 'Hello World',
                        src:  '++++++++++[>+++++++>++++++++++>+++>+<<<<-]>++.>+.+++++++..+++.>++.<<+++++++++++++++.>.+++.------.--------.>+.>.'
                      });
